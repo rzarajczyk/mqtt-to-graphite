@@ -58,7 +58,7 @@ def is_number(string):
 
 def on_connect(client, userdata, flags, rc):
     LOGGER.info("Connected with result code %s" % str(rc))
-    client.subscribe("homie/homey/#")
+    client.subscribe("homie/#")
 
 
 def on_message(client, userdata, msg):
