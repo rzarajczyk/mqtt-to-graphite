@@ -1,15 +1,14 @@
-import socket
-
-import paho.mqtt.client as mqtt
-import time
 import logging
 import os
 import shutil
-import yaml
+import socket
+import time
 from logging import config as logging_config
 
+import paho.mqtt.client as mqtt
+import yaml
 
-ROOT = "/mqtt-to-graphite"
+ROOT = os.environ.get('APP_ROOT', ".")
 
 ########################################################################################################################
 # logging configuration
@@ -43,8 +42,9 @@ with open(CONFIGURATION, 'r') as f:
 
     IGNORE_PATHS = config['ignore']['paths']
 
+
 ########################################################################################################################
-# utility finctions
+# utility functions
 
 def is_number(string):
     try:
@@ -53,8 +53,26 @@ def is_number(string):
     except ValueError:
         return False
 
+
+def is_boolean(string):
+    return string in ['true', 'false']
+
+
 ########################################################################################################################
 # core logic
+
+def is_acceptable(payload):
+    return is_number(payload) or is_boolean(payload)
+
+
+def normalize(payload):
+    if payload == 'true':
+        return 1
+    elif payload == 'false':
+        return 0
+    else:
+        return payload
+
 
 def on_connect(client, userdata, flags, rc):
     LOGGER.info("Connected with result code %s" % str(rc))
@@ -63,23 +81,23 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
     payload = msg.payload.decode(encoding='UTF-8')
-    if is_number(payload):
-        parts = msg.topic.split('/')
-        root = parts[0]
-        if root != 'homie':
-            LOGGER.warning('unsupported topic: %s (root is not "homie")' % msg.topic)
+    parts = msg.topic.split('/')
+    root = parts[0]
+    if root == 'homie':
         i = 1
         while i < len(parts) and not parts[i].startswith("$"):
             i += 1
         if i == len(parts):
             path = '.'.join(parts[1:])
             if path not in IGNORE_PATHS:
-                metric = '%s %s %d\n' % (path, payload, int(time.time()))
-                LOGGER.info('> sending: %s' % metric.strip())
-                sock = socket.socket()
-                sock.connect((GRAPHITE_HOST, GRAPHITE_PORT))
-                sock.sendall(metric.encode(encoding='UTF-8'))
-                sock.close()
+                if is_acceptable(payload):
+                    payload = normalize(payload)
+                    metric = '%s %s %d\n' % (path, payload, int(time.time()))
+                    LOGGER.info('> sending: %s' % metric.strip())
+                    sock = socket.socket()
+                    sock.connect((GRAPHITE_HOST, GRAPHITE_PORT))
+                    sock.sendall(metric.encode(encoding='UTF-8'))
+                    sock.close()
 
 
 client = mqtt.Client()

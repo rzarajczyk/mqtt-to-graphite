@@ -1,5 +1,6 @@
 FROM python:3
 ENV TZ="Europe/Warsaw"
+ENV APP_ROOT="/mqtt-to-graphite"
 
 RUN mkdir -p /mqtt-to-graphite
 RUN mkdir -p /mqtt-to-graphite/config
