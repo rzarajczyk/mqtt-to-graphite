@@ -7,6 +7,7 @@ from logging import config as logging_config
 
 import paho.mqtt.client as mqtt
 import yaml
+from apscheduler.schedulers.background import BackgroundScheduler
 
 ROOT = os.environ.get('APP_ROOT', ".")
 
@@ -43,6 +44,8 @@ with open(CONFIGURATION, 'r') as f:
 
     IGNORE_PATHS = config['ignore']['paths']
 
+    CONVERTIONS = config['convertions']
+
 
 ########################################################################################################################
 # utility functions
@@ -55,24 +58,8 @@ def is_number(string):
         return False
 
 
-def is_boolean(string):
-    return string in ['true', 'false']
-
-
 ########################################################################################################################
 # core logic
-
-def is_acceptable(payload):
-    return is_number(payload) or is_boolean(payload)
-
-
-def normalize(payload):
-    if payload == 'true':
-        return 1
-    elif payload == 'false':
-        return 0
-    else:
-        return payload
 
 
 def on_connect(client, userdata, flags, rc):
@@ -80,25 +67,48 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("homie/#")
 
 
+def convert(topic, payload):
+    if is_number(payload):
+        return payload
+    if payload == 'true':
+        return 1
+    if payload == 'false':
+        return 0
+    if topic in CONVERTIONS:
+        return CONVERTIONS[topic].get(payload, None)
+    else:
+        return None
+
+
+METRICS = {}
+
+
 def on_message(client, userdata, msg):
+    topic: str = msg.topic
     payload = msg.payload.decode(encoding='UTF-8')
-    parts = msg.topic.split('/')
-    root = parts[0]
-    if root == 'homie':
-        i = 1
-        while i < len(parts) and not parts[i].startswith("$"):
-            i += 1
-        if i == len(parts):
-            path = '.'.join(parts[1:])
-            if path not in IGNORE_PATHS:
-                if is_acceptable(payload):
-                    payload = normalize(payload)
-                    metric = '%s %s %d\n' % (path, payload, int(time.time()))
-                    LOGGER.info('> sending: %s' % metric.strip())
-                    sock = socket.socket()
-                    sock.connect((GRAPHITE_HOST, GRAPHITE_PORT))
-                    sock.sendall(metric.encode(encoding='UTF-8'))
-                    sock.close()
+    if topic.startswith('homie/'):
+        if not topic.endswith('/set'):
+            if '$' not in topic:
+                path = topic.replace('/', '.')
+                converted_payload = convert(topic, payload)
+                if converted_payload is not None:
+                    METRICS[path] = converted_payload
+                    LOGGER.info('> metric received: %s -> %s' % (topic, converted_payload))
+                else:
+                    LOGGER.warning('> IGNORING: %s -> %s' % (topic, payload))
+
+
+def run():
+    LOGGER.info("Sending metrics...")
+    now = int(time.time())
+    sock = socket.socket()
+    sock.connect((GRAPHITE_HOST, GRAPHITE_PORT))
+    for path in METRICS:
+        metric = '%s %s %d\n' % (path, METRICS[path], now)
+        LOGGER.info('> sending: %s' % metric.strip())
+        sock.sendall(metric.encode(encoding='UTF-8'))
+    sock.close()
+    LOGGER.info("Sending metrics finished")
 
 
 client = mqtt.Client()
@@ -107,5 +117,9 @@ client.on_connect = on_connect
 client.on_message = on_message
 
 client.connect(MQTT_HOST, MQTT_PORT)
+
+scheduler = BackgroundScheduler(timezone="Europe/Warsaw")
+scheduler.add_job(run, 'interval', seconds=10)
+scheduler.start()
 
 client.loop_forever()
