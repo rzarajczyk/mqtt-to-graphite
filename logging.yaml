@@ -10,7 +10,7 @@ handlers:
   file:
     class : logging.handlers.RotatingFileHandler
     formatter: standard
-    filename: ./logs/mqtt-to-graphite.log
+    filename: ./logs/mqtt-to-graphite.txt
     maxBytes: 1024000
     backupCount: 3
 formatters:
