@@ -9,16 +9,11 @@ import paho.mqtt.client as mqtt
 import yaml
 from apscheduler.schedulers.background import BackgroundScheduler
 
-ROOT = os.environ.get('APP_ROOT', ".")
 
 ########################################################################################################################
 # logging configuration
 
-LOGGER_CONFIGURATION = "%s/config/logging.yaml" % ROOT
-if not os.path.isfile(LOGGER_CONFIGURATION):
-    shutil.copy("%s/config-defaults/logging.yaml" % ROOT, LOGGER_CONFIGURATION)
-
-with open(LOGGER_CONFIGURATION, 'r') as f:
+with open('logging.yaml', 'r') as f:
     config = yaml.full_load(f)
     logging_config.dictConfig(config)
 
@@ -28,11 +23,7 @@ LOGGER.info("Starting application!")
 ########################################################################################################################
 # application configuration
 
-CONFIGURATION = "%s/config/application.yaml" % ROOT
-if not os.path.isfile(CONFIGURATION):
-    shutil.copy("%s/config-defaults/application.yaml" % ROOT, CONFIGURATION)
-
-with open(CONFIGURATION, 'r') as f:
+with open('config/mqtt-to-graphite.yaml', 'r') as f:
     config = yaml.full_load(f)
 
     GRAPHITE_HOST = config['graphite']['host']
