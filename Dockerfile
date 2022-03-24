@@ -1,9 +1,7 @@
 FROM python:3
 ENV TZ="Europe/Warsaw"
 
-RUN mkdir -p /mqtt-to-graphite
 RUN mkdir -p /mqtt-to-graphite/config
-RUN mkdir -p /mqtt-to-graphite/logs
 
 WORKDIR /mqtt-to-graphite
 

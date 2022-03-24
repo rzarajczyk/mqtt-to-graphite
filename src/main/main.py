@@ -1,6 +1,4 @@
 import logging
-import os
-import shutil
 import socket
 import time
 from logging import config as logging_config
@@ -9,19 +7,12 @@ import paho.mqtt.client as mqtt
 import yaml
 from apscheduler.schedulers.background import BackgroundScheduler
 
-
-########################################################################################################################
-# logging configuration
-
 with open('logging.yaml', 'r') as f:
     config = yaml.full_load(f)
     logging_config.dictConfig(config)
 
 LOGGER = logging.getLogger("main")
 LOGGER.info("Starting application!")
-
-########################################################################################################################
-# application configuration
 
 with open('config/mqtt-to-graphite.yaml', 'r') as f:
     config = yaml.full_load(f)
@@ -33,13 +24,8 @@ with open('config/mqtt-to-graphite.yaml', 'r') as f:
     MQTT_USER = config['mqtt']['user']
     MQTT_PASS = config['mqtt']['password']
 
-    IGNORE_PATHS = config['ignore']['paths']
-
     CONVERTIONS = config['convertions']
 
-
-########################################################################################################################
-# utility functions
 
 def is_number(string):
     try:
@@ -47,10 +33,6 @@ def is_number(string):
         return True
     except ValueError:
         return False
-
-
-########################################################################################################################
-# core logic
 
 
 def on_connect(client, userdata, flags, rc):
