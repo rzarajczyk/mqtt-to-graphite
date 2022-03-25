@@ -16,14 +16,12 @@ LOGGER.info("Starting application!")
 
 with open('config/mqtt-to-graphite.yaml', 'r') as f:
     config = yaml.full_load(f)
-
     GRAPHITE_HOST = config['graphite']['host']
     GRAPHITE_PORT = config['graphite']['port']
     MQTT_HOST = config['mqtt']['host']
     MQTT_PORT = config['mqtt']['port']
     MQTT_USER = config['mqtt']['user']
     MQTT_PASS = config['mqtt']['password']
-
     CONVERTIONS = config['convertions']
 
 
@@ -66,7 +64,7 @@ def on_message(client, userdata, msg):
                 converted_payload = convert(topic, payload)
                 if converted_payload is not None:
                     METRICS[path] = converted_payload
-                    LOGGER.info('> metric received: %s -> %s' % (topic, converted_payload))
+                    LOGGER.debug('> metric received: %s -> %s' % (topic, converted_payload))
                 else:
                     LOGGER.warning('> IGNORING: %s -> %s' % (topic, payload))
 
