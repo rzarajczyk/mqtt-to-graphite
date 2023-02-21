@@ -1,28 +1,19 @@
-import logging
 import socket
 import time
-from logging import config as logging_config
 
 import paho.mqtt.client as mqtt
-import yaml
 from apscheduler.schedulers.background import BackgroundScheduler
+from bootstrap.bootstrap import start_service
 
-with open('logging.yaml', 'r') as f:
-    config = yaml.full_load(f)
-    logging_config.dictConfig(config)
+config, logger, timezone = start_service()
 
-LOGGER = logging.getLogger("main")
-LOGGER.info("Starting application!")
-
-with open('config/mqtt-to-graphite.yaml', 'r') as f:
-    config = yaml.full_load(f)
-    GRAPHITE_HOST = config['graphite']['host']
-    GRAPHITE_PORT = config['graphite']['port']
-    MQTT_HOST = config['mqtt']['host']
-    MQTT_PORT = config['mqtt']['port']
-    MQTT_USER = config['mqtt']['user']
-    MQTT_PASS = config['mqtt']['password']
-    CONVERTIONS = config['convertions']
+GRAPHITE_HOST = config['graphite']['host']
+GRAPHITE_PORT = config['graphite']['port']
+MQTT_HOST = config['mqtt']['host']
+MQTT_PORT = config['mqtt']['port']
+MQTT_USER = config['mqtt']['user']
+MQTT_PASS = config['mqtt']['password']
+CONVERTIONS = config['convertions']
 
 
 def is_number(string):
@@ -34,7 +25,7 @@ def is_number(string):
 
 
 def on_connect(client, userdata, flags, rc):
-    LOGGER.info("Connected with result code %s" % str(rc))
+    logger.info("Connected with result code %s" % str(rc))
     client.subscribe("homie/#")
 
 
@@ -64,22 +55,22 @@ def on_message(client, userdata, msg):
                 converted_payload = convert(topic, payload)
                 if converted_payload is not None:
                     METRICS[path] = converted_payload
-                    LOGGER.debug('> metric received: %s -> %s' % (topic, converted_payload))
+                    logger.debug('> metric received: %s -> %s' % (topic, converted_payload))
                 else:
-                    LOGGER.warning('> IGNORING: %s -> %s' % (topic, payload))
+                    logger.warning('> IGNORING: %s -> %s' % (topic, payload))
 
 
 def run():
-    LOGGER.info("Sending metrics...")
+    logger.info("Sending metrics...")
     now = int(time.time())
     sock = socket.socket()
     sock.connect((GRAPHITE_HOST, GRAPHITE_PORT))
     for path in METRICS:
         metric = '%s %s %d\n' % (path, METRICS[path], now)
-        LOGGER.info('> sending: %s' % metric.strip())
+        logger.info('> sending: %s' % metric.strip())
         sock.sendall(metric.encode(encoding='UTF-8'))
     sock.close()
-    LOGGER.info("Sending metrics finished")
+    logger.info("Sending metrics finished")
 
 
 client = mqtt.Client()
@@ -89,7 +80,7 @@ client.on_message = on_message
 
 client.connect(MQTT_HOST, MQTT_PORT)
 
-scheduler = BackgroundScheduler(timezone="Europe/Warsaw")
+scheduler = BackgroundScheduler(timezone=timezone)
 scheduler.add_job(run, 'interval', seconds=10)
 scheduler.start()
 
